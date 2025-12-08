@@ -153,7 +153,9 @@ main/manager-web/node_modules
 .private_config.yaml
 .env.development
 
-# model files
+# model files - 排除所有模型文件，只保留代码
+main/xiaozhi-server/models/llm/
+main/xiaozhi-server/models/tts/
 main/xiaozhi-server/models/SenseVoiceSmall/model.pt
 main/xiaozhi-server/models/sherpa-onnx*
 /main/xiaozhi-server/audio_ref/

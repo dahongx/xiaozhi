@@ -39,3 +39,5 @@ psutil==7.0.0
 portalocker==3.2.0
 Jinja2==3.1.6
 vosk==0.3.44
+transformers>=4.30.0
+accelerate>=0.20.0
