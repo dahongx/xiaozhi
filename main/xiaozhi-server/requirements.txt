@@ -41,3 +41,4 @@ Jinja2==3.1.6
 vosk==0.3.44
 transformers>=4.30.0
 accelerate>=0.20.0
+dateparser==1.2.0

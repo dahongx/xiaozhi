@@ -158,6 +158,8 @@ main/xiaozhi-server/models/llm/
 main/xiaozhi-server/models/tts/
 main/xiaozhi-server/models/SenseVoiceSmall/model.pt
 main/xiaozhi-server/models/sherpa-onnx*
+main/xiaozhi-server/models/.paddlespeech/
+main/xiaozhi-server/models/.paddlenlp/
 /main/xiaozhi-server/audio_ref/
 /audio_ref/
 /asr-models/iic/SenseVoiceSmall/
@@ -186,3 +188,12 @@ uploadfile
 !main/manager-mobile/**/.env*
 !main/manager-mobile/**/*.json
 !main/xiaozhi-server/**/*.json
+
+test_paddle_simple.py
+test_paddlespeech_tts.py
+README_后台运行.md
+如何启动模拟器.md
+main\xiaozhi-server\test_time_query.py
+main\xiaozhi-server\test_dateparser.py
+main\xiaozhi-server\气象助手使用说明.md
+main\xiaozhi-server\scripts\README_SIMULATOR.md
