@@ -1,7 +1,7 @@
 # Stop Meteo Data Simulator
 
-# 使用脚本所在目录作为工作目录（相对路径）
-$WorkDir = $PSScriptRoot
+# 使用当前目录作为工作目录
+$WorkDir = (Get-Location).Path
 $PidFile = "$WorkDir\logs\simulator.pid"
 
 Write-Host "============================================================"

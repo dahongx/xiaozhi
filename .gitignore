@@ -197,3 +197,6 @@ main\xiaozhi-server\test_time_query.py
 main\xiaozhi-server\test_dateparser.py
 main\xiaozhi-server\气象助手使用说明.md
 main\xiaozhi-server\scripts\README_SIMULATOR.md
+test_cn2an_simple.py
+test_sherpa_number.py
+check_wind_data.py

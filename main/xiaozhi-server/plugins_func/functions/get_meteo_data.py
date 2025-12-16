@@ -326,13 +326,14 @@ GET_METEO_DATA_DESC = {
 }
 
 # 用户输入到要素代码的映射
+# 注意：长的关键词要放在前面，避免被短的先匹配
 USER_INPUT_MAP = {
     "温度": "TEMPA", "气温": "TEMPA", "多少度": "TEMPA",
     "湿度": "HUMIA", "相对湿度": "HUMIA",
     "气压": "PRESA", "大气压": "PRESA",
+    "风向": "WDIRA",  # 风向必须在"风"之前
     "风速": "WSPDA", "风": "WSPDA",
-    "风向": "WDIRA",
-    "降水": "PRECA", "降水量": "PRECA", "雨量": "PRECA",
+    "降水量": "PRECA", "降水": "PRECA", "雨量": "PRECA",  # 降水量在降水之前
     "能见度": "VISIA",
     "紫外线": "UVRAA",
 }
@@ -349,10 +350,13 @@ def get_meteo_data(conn, element: str, time_query: str = None):
         time_query: 时间查询表达式（可选）
     """
     # 将用户输入映射到要素代码
+    # 按关键词长度从长到短排序，优先匹配更具体的关键词
     element_code = None
-    for key, code in USER_INPUT_MAP.items():
+    sorted_keys = sorted(USER_INPUT_MAP.keys(), key=len, reverse=True)
+    for key in sorted_keys:
         if key in element:
-            element_code = code
+            element_code = USER_INPUT_MAP[key]
+            logger.bind(tag=TAG).info(f"匹配到要素: {key} -> {element_code}")
             break
 
     if not element_code:

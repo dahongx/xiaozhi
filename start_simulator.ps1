@@ -1,8 +1,8 @@
 # Meteo Data Simulator - Background Startup Script
 # Similar to Linux nohup command
 
-# 使用脚本所在目录作为工作目录（相对路径）
-$WorkDir = $PSScriptRoot
+# 使用当前目录作为工作目录
+$WorkDir = (Get-Location).Path
 $LogDir = "$WorkDir\logs"
 $StdoutLog = "$LogDir\simulator.log"
 $StderrLog = "$LogDir\simulator_err.log"

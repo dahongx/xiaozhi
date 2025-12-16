@@ -1,6 +1,7 @@
 import os
 import sys
 import io
+import re
 import wave
 from config.logger import setup_logging
 from config.config_loader import get_project_dir
@@ -12,6 +13,14 @@ except ImportError:
     raise ImportError(
         "sherpa-onnx库未安装，请运行: pip install sherpa-onnx"
     )
+
+try:
+    import cn2an
+    CN2AN_AVAILABLE = True
+except ImportError:
+    CN2AN_AVAILABLE = False
+    logger = setup_logging()
+    logger.warning("cn2an库未安装，数字将无法正确转换为中文。建议运行: pip install cn2an")
 
 TAG = __name__
 logger = setup_logging()
@@ -32,6 +41,128 @@ class CaptureOutput:
         # 将捕获到的内容通过 logger 输出
         if self.output:
             logger.bind(tag=TAG).debug(self.output.strip())
+
+
+def convert_numbers_to_chinese(text: str) -> str:
+    """
+    将文本中的数字和单位转换为中文
+
+    Args:
+        text: 输入文本
+
+    Returns:
+        转换后的文本
+
+    Examples:
+        "温度是28.2℃" -> "温度是二十八点二摄氏度"
+        "风速11.0 m/s" -> "风速十一点零米每秒"
+        "今天是2025年12月16日" -> "今天是二零二五年十二月十六日"
+    """
+    if not CN2AN_AVAILABLE:
+        logger.bind(tag=TAG).warning("cn2an 库不可用，跳过数字转换")
+        return text
+
+    try:
+        logger.bind(tag=TAG).debug(f"开始数字转换: {text}")
+
+        # 0. 先处理百分比（必须在其他转换之前，因为需要特殊处理）
+        # 匹配 "数字 %" 或 "数字%" 的模式
+        def replace_percentage(match):
+            num_str = match.group(1).strip()
+            try:
+                if '.' in num_str:
+                    # 小数百分比：65.3% -> 百分之六十五点三
+                    parts = num_str.split('.')
+                    integer_part = cn2an.an2cn(parts[0], "low")
+                    decimal_part = ''.join([cn2an.an2cn(d, "low") for d in parts[1]])
+                    return f"百分之{integer_part}点{decimal_part}"
+                else:
+                    # 整数百分比：80% -> 百分之八十
+                    return f"百分之{cn2an.an2cn(num_str, 'low')}"
+            except:
+                return match.group(0)
+
+        text = re.sub(r'(\d+(?:\.\d+)?)\s*%', replace_percentage, text)
+
+        # 1. 处理单位符号和特殊字符（注意顺序：长的在前，避免被短的先替换）
+        unit_map = {
+            # 复合单位（必须在单个单位之前处理）
+            'W/m²': '瓦每平方米',
+            'W/m2': '瓦每平方米',
+            'm/s': '米每秒',
+            'km/h': '千米每小时',
+            # 温度单位
+            '℃': '摄氏度',
+            '°C': '摄氏度',
+            '°F': '华氏度',
+            # 压力单位
+            'hPa': '百帕',
+            'Pa': '帕',
+            # 长度单位
+            'mm': '毫米',
+            'cm': '厘米',
+            'km': '千米',
+            # 角度
+            '°': '度',
+            # 标点符号
+            '：': ',',  # 中文冒号转为逗号（更自然）
+            ':': ',',   # 英文冒号转为逗号
+        }
+
+        for symbol, chinese in unit_map.items():
+            text = text.replace(symbol, chinese)
+
+        # 处理单独的 "m"（米），但要避免误替换单词中的 m
+        # 只替换 "数字 m" 或 "数字m" 的情况
+        text = re.sub(r'(\d)\s*m(?=\s|$|[,，。.])', r'\1米', text)
+
+        # 2. 处理小数（如 28.2 -> 二十八点二）
+        def replace_decimal(match):
+            num_str = match.group(0)
+            try:
+                parts = num_str.split('.')
+                integer_part = cn2an.an2cn(parts[0], "low")
+                decimal_part = ''.join([cn2an.an2cn(d, "low") for d in parts[1]])
+                return f"{integer_part}点{decimal_part}"
+            except:
+                return num_str
+
+        text = re.sub(r'\d+\.\d+', replace_decimal, text)
+
+        # 2. 处理年份（如 2025 -> 二零二五）
+        def replace_year(match):
+            year_str = match.group(1)
+            try:
+                # 年份按数字逐个读
+                return ''.join([cn2an.an2cn(d, "low") for d in year_str]) + '年'
+            except:
+                return match.group(0)
+
+        text = re.sub(r'(\d{4})年', replace_year, text)
+
+        # 3. 处理长数字串（如电话号码，超过4位的连续数字）
+        def replace_long_number(match):
+            num_str = match.group(0)
+            if len(num_str) > 4:
+                # 长数字按位读
+                try:
+                    return ''.join([cn2an.an2cn(d, "low") for d in num_str])
+                except:
+                    return num_str
+            else:
+                # 短数字正常转换
+                try:
+                    return cn2an.an2cn(num_str, "low")
+                except:
+                    return num_str
+
+        text = re.sub(r'\d+', replace_long_number, text)
+
+        return text
+
+    except Exception as e:
+        logger.bind(tag=TAG).warning(f"数字转换失败: {e}，返回原文本")
+        return text
 
 
 class TTSProvider(TTSProviderBase):
@@ -145,17 +276,22 @@ class TTSProvider(TTSProviderBase):
     async def text_to_speak(self, text, output_file):
         """
         将文本转换为语音
-        
+
         Args:
             text: 要合成的文本
             output_file: 输出文件路径，如果为None则返回音频字节数据
-        
+
         Returns:
             如果output_file为None，返回音频字节数据；否则返回None
         """
         try:
+            # 将数字转换为中文
+            processed_text = convert_numbers_to_chinese(text)
+            if processed_text != text:
+                logger.bind(tag=TAG).info(f"数字转换: {text} -> {processed_text}")
+
             # 使用sherpa-onnx进行语音合成
-            audio = self.tts.generate(text, sid=self.speaker_id, speed=1.0)
+            audio = self.tts.generate(processed_text, sid=self.speaker_id, speed=1.0)
             
             # 获取音频数据
             import numpy as np
