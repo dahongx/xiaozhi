@@ -12,9 +12,25 @@ import importlib
 logger = setup_logging()
 
 
+def get_base_path():
+    """获取基础路径，支持打包环境"""
+    if getattr(sys, 'frozen', False):
+        # PyInstaller 打包后
+        return sys._MEIPASS
+    else:
+        # 开发环境
+        return project_root
+
+
 def create_instance(class_name, *args, **kwargs):
     # 创建LLM实例
-    if os.path.exists(os.path.join('core', 'providers', 'llm', class_name, f'{class_name}.py')):
+    base_path = get_base_path()
+    provider_path = os.path.join(base_path, 'core', 'providers', 'llm', class_name, f'{class_name}.py')
+    
+    # 也检查开发环境路径
+    dev_path = os.path.join('core', 'providers', 'llm', class_name, f'{class_name}.py')
+    
+    if os.path.exists(provider_path) or os.path.exists(dev_path):
         lib_name = f'core.providers.llm.{class_name}.{class_name}'
         if lib_name not in sys.modules:
             sys.modules[lib_name] = importlib.import_module(f'{lib_name}')

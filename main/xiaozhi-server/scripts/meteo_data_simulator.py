@@ -13,22 +13,101 @@ import random
 import math
 import time
 import argparse
+import sqlite3
 from datetime import datetime, timedelta
 
-# 添加项目路径
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from plugins_func.functions.get_meteo_data import save_meteo_data, init_database
-import sqlite3
+def get_db_path():
+    """获取数据库路径，支持开发环境和打包环境"""
+    # 检查是否是打包后的环境
+    if getattr(sys, 'frozen', False):
+        # PyInstaller 打包后，使用 EXE 所在目录的上级 data 目录（共享）
+        exe_dir = os.path.dirname(sys.executable)
+        parent_dir = os.path.dirname(exe_dir)
+        shared_db = os.path.join(parent_dir, "data", "meteo_data.db")
+        # 确保目录存在
+        os.makedirs(os.path.dirname(shared_db), exist_ok=True)
+        return shared_db
+    else:
+        # 开发环境
+        return os.path.join(os.path.dirname(__file__), "..", "data", "meteo_data.db")
+
 
 # 数据库路径
-DB_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "meteo_data.db")
+DB_PATH = get_db_path()
+
+
+# 判断是否打包环境，避免导入复杂依赖
+if getattr(sys, 'frozen', False):
+    # 打包环境：使用简化版本，不依赖主项目模块
+    def save_meteo_data(data: dict):
+        """保存气象数据到数据库（简化版）
+        
+        Args:
+            data: 包含以下字段的字典:
+                - station_id: 站点ID
+                - obs_time: 观测时间 (datetime 或字符串)
+                - elements: 气象要素字典，格式为 {element_code: {"value": ..., "qc_code": ...}}
+        """
+        station_id = data.get('station_id', 'LOCAL')
+        obs_time = data.get('obs_time')
+        elements = data.get('elements', {})
+        
+        # 如果是 datetime 对象，转换为字符串
+        if hasattr(obs_time, 'strftime'):
+            obs_time = obs_time.strftime('%Y-%m-%d %H:%M:%S')
+        
+        with sqlite3.connect(DB_PATH) as conn:
+            # 遍历每个气象要素并保存
+            for element_code, element_data in elements.items():
+                value = element_data.get('value')
+                qc_code = element_data.get('qc_code', 0)
+                
+                conn.execute("""
+                    INSERT OR REPLACE INTO meteo_data 
+                    (station_id, obs_time, element_code, value, qc_code) 
+                    VALUES (?, ?, ?, ?, ?)
+                """, (station_id, obs_time, element_code, value, qc_code))
+            conn.commit()
+    
+    def init_database():
+        """初始化数据库（简化版）"""
+        os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS meteo_data (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    station_id TEXT DEFAULT 'LOCAL',
+                    obs_time TEXT NOT NULL,
+                    element_code TEXT NOT NULL,
+                    value REAL,
+                    qc_code INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(station_id, obs_time, element_code)
+                )
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_obs_time ON meteo_data(obs_time)")
+            conn.commit()
+        print(f"✓ 数据库已初始化: {DB_PATH}")
+else:
+    # 开发环境：添加项目路径并使用完整版本
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+    from plugins_func.functions.get_meteo_data import save_meteo_data, init_database
 
 # 数据保留天数
 RETENTION_DAYS = 30
 
-# 日志文件路径
-LOG_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "..", "logs")
+# 日志文件路径 - 支持打包环境
+def get_log_dir():
+    """获取日志目录"""
+    if getattr(sys, 'frozen', False):
+        exe_dir = os.path.dirname(sys.executable)
+        parent_dir = os.path.dirname(exe_dir)
+        return os.path.join(parent_dir, "logs")
+    else:
+        return os.path.join(os.path.dirname(__file__), "..", "..", "..", "logs")
+
+LOG_DIR = get_log_dir()
 LOG_FILE = os.path.join(LOG_DIR, "simulator.log")
 ERR_FILE = os.path.join(LOG_DIR, "simulator_err.log")
 

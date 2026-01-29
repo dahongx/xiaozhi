@@ -4,6 +4,7 @@ import sys
 import io
 import psutil
 from config.logger import setup_logging
+from config.config_loader import get_internal_dir
 from typing import Optional, Tuple, List
 from core.providers.asr.base import ASRProviderBase
 from funasr import AutoModel
@@ -46,7 +47,15 @@ class ASRProvider(ASRProviderBase):
             logger.bind(tag=TAG).error(f"可用内存不足2G，当前仅有 {total_mem / (1024*1024):.2f} MB，可能无法启动FunASR")
         
         self.interface_type = InterfaceType.LOCAL
-        self.model_dir = config.get("model_dir")
+        
+        # 处理模型目录路径
+        model_dir = config.get("model_dir")
+        if model_dir and not os.path.isabs(model_dir):
+            internal_dir = get_internal_dir()
+            self.model_dir = os.path.join(internal_dir, model_dir)
+        else:
+            self.model_dir = model_dir
+            
         self.output_dir = config.get("output_dir")  # 修正配置键名
         self.delete_audio_file = delete_audio_file
 

@@ -5,6 +5,7 @@
 """
 import sqlite3
 import os
+import sys
 import threading
 from datetime import datetime, timedelta
 from config.logger import setup_logging
@@ -21,8 +22,26 @@ except ImportError:
 TAG = __name__
 logger = setup_logging()
 
-# 数据库路径
-DB_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "data", "meteo_data.db")
+# 数据库路径 - 支持打包后的共享目录
+def get_db_path():
+    """获取数据库路径，支持开发环境和打包环境"""
+    # 检查是否是打包后的环境
+    if getattr(sys, 'frozen', False):
+        # PyInstaller 打包后，使用 EXE 所在目录的上级 data 目录（共享）
+        exe_dir = os.path.dirname(sys.executable)
+        # 向上找到 dist 目录
+        parent_dir = os.path.dirname(exe_dir)
+        shared_db = os.path.join(parent_dir, "data", "meteo_data.db")
+        if os.path.exists(os.path.dirname(shared_db)):
+            return shared_db
+        # 备选：使用 _internal 目录下的数据库
+        internal_db = os.path.join(exe_dir, "_internal", "data", "meteo_data.db")
+        return internal_db
+    else:
+        # 开发环境
+        return os.path.join(os.path.dirname(__file__), "..", "..", "data", "meteo_data.db")
+
+DB_PATH = get_db_path()
 
 # 气象要素中英文映射
 METEO_DICT = {

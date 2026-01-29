@@ -1,7 +1,12 @@
 import sys
+import os
 import uuid
 import signal
 import asyncio
+import webbrowser
+import threading
+from http.server import HTTPServer, SimpleHTTPRequestHandler
+from functools import partial
 from aioconsole import ainput
 from config.settings import load_config
 from config.logger import setup_logging
@@ -13,6 +18,84 @@ from core.trial_license import check_license, LicenseVerifier
 
 TAG = __name__
 logger = setup_logging()
+
+# PyInstaller 环境下预加载 funasr 模型注册（装饰器需要被执行才能注册模型类）
+def _preload_funasr_models():
+    """预加载 funasr 模型，确保装饰器执行完成注册"""
+    import sys
+    if not getattr(sys, 'frozen', False):
+        return  # 非打包环境不需要预加载
+    
+    try:
+        # PyInstaller 环境中 inspect.getsourcelines 会失败，需要 patch
+        import inspect
+        _original_getsourcelines = inspect.getsourcelines
+        _original_getfile = inspect.getfile
+        
+        def _safe_getsourcelines(obj):
+            try:
+                return _original_getsourcelines(obj)
+            except OSError:
+                return (["# source not available"], 0)
+        
+        def _safe_getfile(obj):
+            try:
+                return _original_getfile(obj)
+            except (OSError, TypeError):
+                return "<frozen>"
+        
+        inspect.getsourcelines = _safe_getsourcelines
+        inspect.getfile = _safe_getfile
+        
+        # 导入这些模块会触发 @tables.register 装饰器，从而注册模型类
+        import funasr.models.sense_voice.model
+        import funasr.models.paraformer.model
+        import funasr.models.ct_transformer.model
+        import funasr.models.fsmn_vad_streaming.model
+        import funasr.frontends.wav_frontend
+        
+        # 恢复原始函数（可选，保持兼容性）
+        # inspect.getsourcelines = _original_getsourcelines
+        # inspect.getfile = _original_getfile
+    except ImportError:
+        pass  # 如果没有安装 funasr，忽略
+    except Exception:
+        pass  # 其他错误也忽略，让程序继续运行
+
+_preload_funasr_models()
+
+# 测试页面HTTP服务器
+TEST_PAGE_PORT = 8006
+
+def start_test_page_server():
+    """启动测试页面的HTTP服务器（在后台线程中运行）"""
+    test_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'test')
+    if not os.path.exists(test_dir):
+        logger.bind(tag=TAG).warning("测试目录不存在: {}", test_dir)
+        return False
+    
+    try:
+        handler = partial(SimpleHTTPRequestHandler, directory=test_dir)
+        server = HTTPServer(('0.0.0.0', TEST_PAGE_PORT), handler)
+        
+        # 在后台线程中运行服务器
+        server_thread = threading.Thread(target=server.serve_forever, daemon=True)
+        server_thread.start()
+        
+        logger.bind(tag=TAG).info("测试页面服务器已启动: http://{}:{}/test_page.html", get_local_ip(), TEST_PAGE_PORT)
+        return True
+    except Exception as e:
+        logger.bind(tag=TAG).error("启动测试页面服务器失败: {}", str(e))
+        return False
+
+def open_test_page():
+    """在浏览器中自动打开测试页面"""
+    url = f"http://127.0.0.1:{TEST_PAGE_PORT}/test_page.html"
+    try:
+        webbrowser.open(url)
+        logger.bind(tag=TAG).info("已自动打开测试页面: {}", url)
+    except Exception as e:
+        logger.bind(tag=TAG).warning("无法自动打开浏览器: {}", str(e))
 
 
 async def wait_for_exit() -> None:
@@ -71,6 +154,12 @@ async def main():
         return
     logger.bind(tag=TAG).info("许可证验证通过")
     # ==================================
+    
+    # ============ 自动启动测试页面 ============
+    # 许可证验证通过后，启动测试页面服务器并自动打开浏览器
+    if start_test_page_server():
+        open_test_page()
+    # ========================================
     
     check_ffmpeg_installed()
     config = load_config()

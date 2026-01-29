@@ -7,6 +7,7 @@ import os
 import cnlunar
 from typing import Dict, Any
 from config.logger import setup_logging
+from config.config_loader import get_internal_dir
 from jinja2 import Template
 
 TAG = __name__
@@ -79,8 +80,15 @@ class PromptManager:
                 return
 
             # 缓存未命中，从文件读取
-            if os.path.exists(template_path):
-                with open(template_path, "r", encoding="utf-8") as f:
+            # 处理相对路径
+            if not os.path.isabs(template_path):
+                internal_dir = get_internal_dir()
+                full_path = os.path.join(internal_dir, template_path)
+            else:
+                full_path = template_path
+                
+            if os.path.exists(full_path):
+                with open(full_path, "r", encoding="utf-8") as f:
                     template_content = f.read()
 
                 # 存入缓存（CONFIG类型默认不自动过期，需要手动失效）
@@ -90,7 +98,7 @@ class PromptManager:
                 self.base_prompt_template = template_content
                 self.logger.bind(tag=TAG).debug("成功加载基础提示词模板并缓存")
             else:
-                self.logger.bind(tag=TAG).warning(f"未找到{template_path}文件")
+                self.logger.bind(tag=TAG).warning(f"未找到{full_path}文件")
         except Exception as e:
             self.logger.bind(tag=TAG).error(f"加载提示词模板失败: {e}")
 

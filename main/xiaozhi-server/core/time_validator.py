@@ -104,8 +104,30 @@ class TimeValidator:
     def _save_state(self, state: dict):
         """保存时间状态"""
         encrypted = self._encrypt_state(state)
-        with open(self.state_file, 'w', encoding='utf-8') as f:
-            f.write(encrypted)
+        
+        # 如果文件存在，先移除隐藏/只读属性
+        if os.path.exists(self.state_file):
+            try:
+                if platform.system() == 'Windows':
+                    import ctypes
+                    # 移除隐藏和只读属性 (设置为普通属性 0x80 = NORMAL)
+                    ctypes.windll.kernel32.SetFileAttributesW(str(self.state_file), 0x80)
+                else:
+                    os.chmod(self.state_file, 0o644)
+            except:
+                pass
+        
+        try:
+            with open(self.state_file, 'w', encoding='utf-8') as f:
+                f.write(encrypted)
+        except PermissionError:
+            # 如果仍然失败，尝试删除后重新创建
+            try:
+                os.remove(self.state_file)
+                with open(self.state_file, 'w', encoding='utf-8') as f:
+                    f.write(encrypted)
+            except:
+                pass  # 静默失败，不影响程序运行
         
         # Windows 下设置隐藏属性
         if platform.system() == 'Windows':

@@ -4,7 +4,7 @@ import io
 import re
 import wave
 from config.logger import setup_logging
-from config.config_loader import get_project_dir
+from config.config_loader import get_internal_dir
 from core.providers.tts.base import TTSProviderBase
 
 try:
@@ -172,10 +172,10 @@ class TTSProvider(TTSProviderBase):
         # 获取模型目录路径
         model_dir = config.get("model_dir", "models/sherpa-onnx-vits-zh-ll")
         
-        # 处理相对路径，转换为绝对路径
+        # 处理相对路径，转换为绝对路径（使用内部资源目录）
         if not os.path.isabs(model_dir):
-            project_dir = get_project_dir()
-            self.model_dir = os.path.join(project_dir, model_dir)
+            internal_dir = get_internal_dir()
+            self.model_dir = os.path.join(internal_dir, model_dir)
         else:
             self.model_dir = model_dir
         

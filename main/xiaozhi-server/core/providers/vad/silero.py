@@ -1,8 +1,10 @@
+import os
 import time
 import numpy as np
 import torch
 import opuslib_next
 from config.logger import setup_logging
+from config.config_loader import get_internal_dir
 from core.providers.vad.base import VADProviderBase
 
 TAG = __name__
@@ -12,8 +14,15 @@ logger = setup_logging()
 class VADProvider(VADProviderBase):
     def __init__(self, config):
         logger.bind(tag=TAG).info("SileroVAD", config)
+        
+        # 处理模型目录路径
+        model_dir = config["model_dir"]
+        if not os.path.isabs(model_dir):
+            internal_dir = get_internal_dir()
+            model_dir = os.path.join(internal_dir, model_dir)
+        
         self.model, _ = torch.hub.load(
-            repo_or_dir=config["model_dir"],
+            repo_or_dir=model_dir,
             source="local",
             model="silero_vad",
             force_reload=False,

@@ -4,6 +4,7 @@ import time
 from typing import Optional, Tuple, List
 from .base import ASRProviderBase
 from config.logger import setup_logging
+from config.config_loader import get_internal_dir
 from core.providers.asr.dto.dto import InterfaceType
 import vosk
 
@@ -14,7 +15,15 @@ class ASRProvider(ASRProviderBase):
     def __init__(self, config: dict, delete_audio_file: bool = True):
         super().__init__()
         self.interface_type = InterfaceType.LOCAL
-        self.model_path = config.get("model_path")
+        
+        # 处理模型路径
+        model_path = config.get("model_path")
+        if model_path and not os.path.isabs(model_path):
+            internal_dir = get_internal_dir()
+            self.model_path = os.path.join(internal_dir, model_path)
+        else:
+            self.model_path = model_path
+            
         self.output_dir = config.get("output_dir", "tmp/")
         self.delete_audio_file = delete_audio_file
         

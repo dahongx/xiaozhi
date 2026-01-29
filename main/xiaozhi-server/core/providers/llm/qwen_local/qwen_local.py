@@ -4,7 +4,7 @@ import threading
 from transformers import AutoModelForCausalLM, AutoTokenizer, TextIteratorStreamer
 from config.logger import setup_logging
 from core.providers.llm.base import LLMProviderBase
-from config.config_loader import get_project_dir
+from config.config_loader import get_internal_dir
 
 TAG = __name__
 logger = setup_logging()
@@ -16,10 +16,10 @@ class LLMProvider(LLMProviderBase):
         if not model_path:
             raise ValueError("model_path 必须配置，指向本地Qwen模型目录")
         
-        # 处理相对路径，转换为绝对路径
+        # 处理相对路径，转换为绝对路径（使用内部资源目录）
         if not os.path.isabs(model_path):
-            project_dir = get_project_dir()
-            self.model_path = os.path.join(project_dir, model_path)
+            internal_dir = get_internal_dir()
+            self.model_path = os.path.join(internal_dir, model_path)
         else:
             self.model_path = model_path
         

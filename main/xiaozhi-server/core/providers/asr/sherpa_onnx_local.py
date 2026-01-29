@@ -4,6 +4,7 @@ import os
 import sys
 import io
 from config.logger import setup_logging
+from config.config_loader import get_internal_dir
 from typing import Optional, Tuple, List
 from core.providers.asr.dto.dto import InterfaceType
 from core.providers.asr.base import ASRProviderBase
@@ -38,7 +39,15 @@ class ASRProvider(ASRProviderBase):
     def __init__(self, config: dict, delete_audio_file: bool):
         super().__init__()
         self.interface_type = InterfaceType.LOCAL
-        self.model_dir = config.get("model_dir")
+        
+        # 处理模型目录路径
+        model_dir = config.get("model_dir")
+        if model_dir and not os.path.isabs(model_dir):
+            internal_dir = get_internal_dir()
+            self.model_dir = os.path.join(internal_dir, model_dir)
+        else:
+            self.model_dir = model_dir
+            
         self.output_dir = config.get("output_dir")
         self.model_type = config.get("model_type", "sense_voice")  # 支持 paraformer
         self.delete_audio_file = delete_audio_file

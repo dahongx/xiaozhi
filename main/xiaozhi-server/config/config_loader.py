@@ -1,12 +1,41 @@
 import os
+import sys
 import yaml
 from collections.abc import Mapping
 from config.manage_api_client import init_service, get_server_config, get_agent_models
 
 
 def get_project_dir():
-    """获取项目根目录"""
-    return os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/"
+    """获取项目根目录，支持开发环境和打包环境"""
+    if getattr(sys, 'frozen', False):
+        # PyInstaller 打包后
+        exe_dir = os.path.dirname(sys.executable)
+        # 先检查 EXE 所在目录的上级（共享目录）
+        parent_dir = os.path.dirname(exe_dir)
+        if os.path.exists(os.path.join(parent_dir, "config.yaml")):
+            return parent_dir + "/"
+        # 备选：_internal 目录
+        internal_dir = os.path.join(exe_dir, "_internal")
+        if os.path.exists(os.path.join(internal_dir, "config.yaml")):
+            return internal_dir + "/"
+        return exe_dir + "/"
+    else:
+        # 开发环境
+        return os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/"
+
+
+def get_internal_dir():
+    """获取内部资源目录（models, core, plugins_func等）"""
+    if getattr(sys, 'frozen', False):
+        # PyInstaller 打包后，内部资源在 _internal 目录
+        exe_dir = os.path.dirname(sys.executable)
+        internal_dir = os.path.join(exe_dir, "_internal")
+        if os.path.exists(internal_dir):
+            return internal_dir + "/"
+        return exe_dir + "/"
+    else:
+        # 开发环境：和 project_dir 相同
+        return os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/"
 
 
 def read_config(config_path):

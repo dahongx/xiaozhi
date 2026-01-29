@@ -9,6 +9,7 @@ from core.handle.sendAudioHandle import send_stt_message
 from plugins_func.register import register_function, ToolType, ActionResponse, Action
 from core.utils.dialogue import Message
 from core.providers.tts.dto.dto import TTSMessageDTO, SentenceType, ContentType
+from config.config_loader import get_internal_dir
 
 TAG = __name__
 
@@ -120,9 +121,13 @@ def initialize_music_handler(conn):
     if MUSIC_CACHE == {}:
         if "play_music" in conn.config["plugins"]:
             MUSIC_CACHE["music_config"] = conn.config["plugins"]["play_music"]
-            MUSIC_CACHE["music_dir"] = os.path.abspath(
-                MUSIC_CACHE["music_config"].get("music_dir", "./music")  # 默认路径修改
-            )
+            music_dir = MUSIC_CACHE["music_config"].get("music_dir", "music")
+            # 处理相对路径
+            if not os.path.isabs(music_dir):
+                internal_dir = get_internal_dir()
+                MUSIC_CACHE["music_dir"] = os.path.join(internal_dir, music_dir)
+            else:
+                MUSIC_CACHE["music_dir"] = music_dir
             MUSIC_CACHE["music_ext"] = MUSIC_CACHE["music_config"].get(
                 "music_ext", (".mp3", ".wav", ".p3")
             )
@@ -130,7 +135,8 @@ def initialize_music_handler(conn):
                 "refresh_time", 60
             )
         else:
-            MUSIC_CACHE["music_dir"] = os.path.abspath("./music")
+            internal_dir = get_internal_dir()
+            MUSIC_CACHE["music_dir"] = os.path.join(internal_dir, "music")
             MUSIC_CACHE["music_ext"] = (".mp3", ".wav", ".p3")
             MUSIC_CACHE["refresh_time"] = 60
         # 获取音乐文件列表
