@@ -9,6 +9,7 @@ from core.utils.util import get_local_ip, validate_mcp_endpoint
 from core.http_server import SimpleHttpServer
 from core.websocket_server import WebSocketServer
 from core.utils.util import check_ffmpeg_installed
+from core.trial_license import check_license, LicenseVerifier
 
 TAG = __name__
 logger = setup_logging()
@@ -42,7 +43,35 @@ async def monitor_stdin():
         await ainput()  # 异步等待输入，消费回车
 
 
+async def periodic_license_check(interval_hours: int = 1):
+    """
+    定期检查许可证状态
+    防止运行期间许可证过期或被篡改
+    """
+    while True:
+        await asyncio.sleep(interval_hours * 3600)  # 每隔 N 小时检查一次
+        try:
+            verifier = LicenseVerifier()
+            valid, remaining_days, message = verifier.verify()
+            if remaining_days <= 1:
+                logger.bind(tag=TAG).warning(f"许可证即将到期: {message}")
+        except Exception as e:
+            logger.bind(tag=TAG).error(f"许可证验证失败: {e}")
+            logger.bind(tag=TAG).error("程序将在 60 秒后退出，请联系管理员续期")
+            await asyncio.sleep(60)
+            sys.exit(1)
+
+
 async def main():
+    # ============ 许可证验证 ============
+    # 启动前验证 license.lic 文件
+    # 无有效许可证时程序将无法启动
+    logger.bind(tag=TAG).info("正在验证许可证...")
+    if not check_license(exit_on_error=True, show_info=True):
+        return
+    logger.bind(tag=TAG).info("许可证验证通过")
+    # ==================================
+    
     check_ffmpeg_installed()
     config = load_config()
 
@@ -62,6 +91,9 @@ async def main():
 
     # 添加 stdin 监控任务
     stdin_task = asyncio.create_task(monitor_stdin())
+    
+    # 添加定期许可证检查任务（每小时检查一次）
+    license_check_task = asyncio.create_task(periodic_license_check(interval_hours=1))
 
     # 启动 WebSocket 服务器
     ws_server = WebSocketServer(config)
@@ -125,12 +157,13 @@ async def main():
         # 取消所有任务（关键修复点）
         stdin_task.cancel()
         ws_task.cancel()
+        license_check_task.cancel()
         if ota_task:
             ota_task.cancel()
 
         # 等待任务终止（必须加超时）
         await asyncio.wait(
-            [stdin_task, ws_task, ota_task] if ota_task else [stdin_task, ws_task],
+            [stdin_task, ws_task, ota_task, license_check_task] if ota_task else [stdin_task, ws_task, license_check_task],
             timeout=3.0,
             return_when=asyncio.ALL_COMPLETED,
         )

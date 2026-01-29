@@ -200,3 +200,15 @@ main\xiaozhi-server\scripts\README_SIMULATOR.md
 test_cn2an_simple.py
 test_sherpa_number.py
 check_wind_data.py
+
+# License 相关敏感文件
+license_tools/keys/*.pem
+license_tools/keys/public_key_for_client.txt
+license_tools/licenses/*.lic
+main/xiaozhi-server/license.lic
+main/xiaozhi-server/core/license.lic
+main/xiaozhi-server/.time_state
+main/xiaozhi-server/scripts/keys/
+main/xiaozhi-server/scripts/licenses/
+*.lic
+.time_state

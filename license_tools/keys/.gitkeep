@@ -1,0 +1,7 @@
+# 此目录用于存储 RSA 密钥对
+# 私钥文件 (private_key.pem) 必须严格保密！
+
+# 运行 python license_generator.py --init 会在此目录生成：
+# - private_key.pem (私钥 - 绝对保密)
+# - public_key.pem (公钥)
+# - public_key_for_client.txt (公钥 - 方便复制到客户端)
